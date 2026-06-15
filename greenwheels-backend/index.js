@@ -10,7 +10,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── Google Sheets Auth ────────────────────────────────────────────────────
 function getSheetsClient() {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   const auth = new google.auth.GoogleAuth({
@@ -23,7 +22,6 @@ function getSheetsClient() {
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const SHEET_NAME = 'Inquiries';
 
-// Ensure the sheet has a header row on first run
 async function ensureHeader() {
   try {
     const sheets = getSheetsClient();
@@ -39,7 +37,7 @@ async function ensureHeader() {
         resource: {
           values: [[
             'Timestamp', 'Bike Plate', 'Full Name', 'Phone', 'Email',
-            'ID / Passport No.', 'Occupation', 'Residence', 'Message', 'Status'
+            'ID / Passport No.', 'Occupation', 'Residence', 'Status'
           ]],
         },
       });
@@ -49,21 +47,56 @@ async function ensureHeader() {
   }
 }
 
+// Check if plate or email already reserved
+async function checkDuplicate(plate, email) {
+  try {
+    const sheets = getSheetsClient();
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!A2:I`,
+    });
+    const rows = res.data.values || [];
+    for (const row of rows) {
+      const rowPlate = (row[1] || '').trim().toUpperCase();
+      const rowEmail = (row[4] || '').trim().toLowerCase();
+      if (rowPlate === plate.toUpperCase()) {
+        return { duplicate: true, reason: 'bike' };
+      }
+      if (email && rowEmail === email.trim().toLowerCase() && rowEmail !== '') {
+        return { duplicate: true, reason: 'email' };
+      }
+    }
+    return { duplicate: false };
+  } catch (e) {
+    console.error('Duplicate check error:', e.message);
+    return { duplicate: false };
+  }
+}
+
 // ─── Routes ────────────────────────────────────────────────────────────────
 
-// Bike inquiry page
 app.get('/bikes/:plate', (req, res) => {
   const plate = req.params.plate.toUpperCase();
   res.send(buildFormPage(plate));
 });
 
-// Form submission
 app.post('/bikes/:plate/inquire', async (req, res) => {
   const plate = req.params.plate.toUpperCase();
-  const { name, phone, email, id_no, occupation, residence, message } = req.body;
+  const { name, phone, email, id_no, occupation, residence } = req.body;
 
-  if (!name || !phone) {
-    return res.status(400).send(buildResultPage(plate, false, 'Name and phone number are required.'));
+  if (!name || !phone || !email || !id_no || !occupation || !residence) {
+    return res.send(buildResultPage(plate, false, 'Please fill in all required fields before reserving.'));
+  }
+
+  // Duplicate check
+  const { duplicate, reason } = await checkDuplicate(plate, email);
+  if (duplicate) {
+    if (reason === 'bike') {
+      return res.send(buildResultPage(plate, false, 'This bike has already been reserved by someone else.'));
+    }
+    if (reason === 'email') {
+      return res.send(buildResultPage(plate, false, 'This email address has already been used to reserve a bike.'));
+    }
   }
 
   try {
@@ -78,12 +111,11 @@ app.post('/bikes/:plate/inquire', async (req, res) => {
           plate,
           name,
           phone,
-          email || '',
-          id_no || '',
-          occupation || '',
-          residence || '',
-          message || '',
-          'New'
+          email,
+          id_no,
+          occupation,
+          residence,
+          'Reserved'
         ]],
       },
     });
@@ -94,7 +126,6 @@ app.post('/bikes/:plate/inquire', async (req, res) => {
   }
 });
 
-// Health check
 app.get('/', (req, res) => res.send('Greenwheels Bike Inquiry API is running.'));
 
 // ─── HTML Builders ─────────────────────────────────────────────────────────
@@ -105,7 +136,7 @@ function buildFormPage(plate) {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Bike Inquiry — ${plate} | Greenwheels</title>
+  <title>Reserve Bike — ${plate} | Greenwheels</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -151,7 +182,7 @@ function buildFormPage(plate) {
     .card h2 { font-size: 1rem; color: #1D9E75; margin-bottom: 20px; border-bottom: 1px solid #e0f5ed; padding-bottom: 10px; }
     .field { margin-bottom: 16px; }
     .field label { display: block; font-size: 0.75rem; color: #555; font-weight: 600; margin-bottom: 5px; letter-spacing: 0.4px; }
-    .field input, .field textarea {
+    .field input {
       width: 100%;
       border: 1.5px solid #d0ede3;
       border-radius: 8px;
@@ -162,28 +193,29 @@ function buildFormPage(plate) {
       transition: border 0.2s;
       background: #fafdfc;
     }
-    .field input:focus, .field textarea:focus { border-color: #1D9E75; background: white; }
-    .field textarea { height: 80px; resize: vertical; }
+    .field input:focus { border-color: #1D9E75; background: white; }
     .required { color: #e05555; }
     .row { display: flex; gap: 12px; }
     .row .field { flex: 1; }
     .submit-btn {
       width: 100%;
-      background: #1D9E75;
+      background: #ccc;
       color: white;
       border: none;
       border-radius: 10px;
       padding: 13px;
       font-size: 1rem;
       font-weight: 700;
-      cursor: pointer;
+      cursor: not-allowed;
       margin-top: 8px;
       letter-spacing: 0.5px;
-      transition: background 0.2s;
+      transition: background 0.3s;
     }
-    .submit-btn:hover { background: #0F6E56; }
+    .submit-btn.ready { background: #1D9E75; cursor: pointer; }
+    .submit-btn.ready:hover { background: #0F6E56; }
     .footer { margin-top: 32px; font-size: 0.72rem; color: #999; text-align: center; }
     .footer a { color: #1D9E75; text-decoration: none; }
+    .note { font-size: 0.72rem; color: #aaa; margin-top: 10px; text-align: center; }
   </style>
 </head>
 <body>
@@ -195,45 +227,42 @@ function buildFormPage(plate) {
   <div class="bike-badge">
     <div class="label">Bike Reference</div>
     <div class="plate">${plate}</div>
-    <div class="sub">Fill the form below to express interest in this bike</div>
+    <div class="sub">Fill in all your details to reserve this bike</div>
   </div>
 
   <div class="card">
     <h2>Your Details</h2>
-    <form method="POST" action="/bikes/${plate}/inquire">
+    <form method="POST" action="/bikes/${plate}/inquire" id="reserveForm">
       <div class="field">
         <label>Full Name <span class="required">*</span></label>
-        <input type="text" name="name" placeholder="e.g. John Kamau" required/>
+        <input type="text" name="name" id="name" placeholder="e.g. John Kamau" required/>
       </div>
       <div class="row">
         <div class="field">
           <label>Phone Number <span class="required">*</span></label>
-          <input type="tel" name="phone" placeholder="07XX XXX XXX" required/>
+          <input type="tel" name="phone" id="phone" placeholder="07XX XXX XXX" required/>
         </div>
         <div class="field">
-          <label>Email Address</label>
-          <input type="email" name="email" placeholder="optional"/>
+          <label>Email Address <span class="required">*</span></label>
+          <input type="email" name="email" id="email" placeholder="your@email.com" required/>
         </div>
       </div>
       <div class="row">
         <div class="field">
-          <label>ID / Passport No.</label>
-          <input type="text" name="id_no" placeholder="National ID or Passport"/>
+          <label>ID / Passport No. <span class="required">*</span></label>
+          <input type="text" name="id_no" id="id_no" placeholder="National ID or Passport" required/>
         </div>
         <div class="field">
-          <label>Occupation</label>
-          <input type="text" name="occupation" placeholder="e.g. Rider, Trader"/>
+          <label>Occupation <span class="required">*</span></label>
+          <input type="text" name="occupation" id="occupation" placeholder="e.g. Rider, Trader" required/>
         </div>
       </div>
       <div class="field">
-        <label>Area of Residence</label>
-        <input type="text" name="residence" placeholder="e.g. Nairobi, Thika"/>
+        <label>Area of Residence <span class="required">*</span></label>
+        <input type="text" name="residence" id="residence" placeholder="e.g. Nairobi, Thika" required/>
       </div>
-      <div class="field">
-        <label>Message / Questions</label>
-        <textarea name="message" placeholder="Any questions about this bike?"></textarea>
-      </div>
-      <button type="submit" class="submit-btn">Submit Inquiry →</button>
+      <button type="submit" class="submit-btn" id="submitBtn" disabled>Fill all fields to Reserve Bike</button>
+      <p class="note">All fields are required before you can reserve this bike.</p>
     </form>
   </div>
 
@@ -241,6 +270,28 @@ function buildFormPage(plate) {
     Greenwheels Mobility Limited · Nairobi, Kenya<br/>
     <a href="mailto:info@greenwheels.co.ke">info@greenwheels.co.ke</a> · +254 700 000 000
   </div>
+
+  <script>
+    const fields = ['name','phone','email','id_no','occupation','residence'];
+    const btn = document.getElementById('submitBtn');
+
+    function checkAllFilled() {
+      const allFilled = fields.every(id => document.getElementById(id).value.trim() !== '');
+      if (allFilled) {
+        btn.disabled = false;
+        btn.classList.add('ready');
+        btn.textContent = 'Reserve Bike →';
+      } else {
+        btn.disabled = true;
+        btn.classList.remove('ready');
+        btn.textContent = 'Fill all fields to Reserve Bike';
+      }
+    }
+
+    fields.forEach(id => {
+      document.getElementById(id).addEventListener('input', checkAllFilled);
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -251,7 +302,7 @@ function buildResultPage(plate, success, errorMsg = '') {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>${success ? 'Inquiry Submitted' : 'Error'} | Greenwheels</title>
+  <title>${success ? 'Bike Reserved!' : 'Error'} | Greenwheels</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -298,15 +349,14 @@ function buildResultPage(plate, success, errorMsg = '') {
   <div class="card">
     ${success ? `
       <div class="icon">✅</div>
-      <h2>Inquiry Submitted!</h2>
+      <h2>Bike Reserved!</h2>
       <div class="plate">${plate}</div>
-      <p>Thank you! Our team will contact you shortly regarding this bike. Please keep your phone available.</p>
-      <a href="/bikes/${plate}" class="back-btn">Back to Bike</a>
+      <p>Your reservation has been received. Our team will contact you shortly to complete the process. Please keep your phone available.</p>
     ` : `
       <div class="icon">⚠️</div>
-      <h2>Something went wrong</h2>
+      <h2>Could Not Reserve</h2>
       <p>${errorMsg}</p>
-      <a href="/bikes/${plate}" class="back-btn">Try Again</a>
+      <a href="/bikes/${plate}" class="back-btn">Go Back</a>
     `}
   </div>
   <div class="footer">Greenwheels Mobility Limited · Nairobi, Kenya</div>
@@ -314,9 +364,6 @@ function buildResultPage(plate, success, errorMsg = '') {
 </html>`;
 }
 
-// ─── Start ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
-  console.log(`Greenwheels backend running on port ${PORT}`);
-  await ensureHeader();
-});
+  console.log(`Greenwheels backend v2 running on port ${PORT}`);
