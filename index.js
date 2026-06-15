@@ -366,4 +366,6 @@ function buildResultPage(plate, success, errorMsg = '') {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
-  console.log(`Greenwheels backend v2 running on port ${PORT}`);
+  console.log(`Greenwheels backend running on port ${PORT}`);
+  await ensureHeader();
+});
