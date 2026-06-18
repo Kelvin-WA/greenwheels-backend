@@ -229,10 +229,7 @@ function buildFormPage(plate, bikeInfo) {
         <div class="field"><label>Phone Number <span class="required">*</span></label><input type="tel" name="phone" id="phone" placeholder="07XX XXX XXX" required/></div>
         <div class="field"><label>Email Address <span class="required">*</span></label><input type="email" name="email" id="email" placeholder="your@email.com" required/></div>
       </div>
-      <div class="row">
-        <div class="field"><label>ID / Passport No. <span class="required">*</span></label><input type="text" name="id_no" id="id_no" placeholder="National ID or Passport" required/></div>
-
-      </div>
+      <div class="field"><label>ID / Passport No. <span class="required">*</span></label><input type="text" name="id_no" id="id_no" placeholder="National ID or Passport" required/></div>
       <div class="field"><label>Area of Residence <span class="required">*</span></label><input type="text" name="residence" id="residence" placeholder="e.g. Nairobi, Thika" required/></div>
       <button type="submit" class="submit-btn" id="submitBtn" disabled>Fill all fields to Reserve Bike</button>
       <p class="note">All fields are required before you can reserve this bike.</p>
