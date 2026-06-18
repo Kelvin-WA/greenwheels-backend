@@ -31,7 +31,7 @@ async function ensureHeader() {
     if (!res.data.values || res.data.values.length === 0) {
       await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A1`, valueInputOption: 'RAW',
-        resource: { values: [['Timestamp','Bike Plate','Full Name','Phone','Email','ID / Passport No.','Occupation','Residence','Daily Rate (KES)','Lease Term (Weeks)','Status']] },
+        resource: { values: [['Timestamp','Bike Plate','Full Name','Phone','Email','ID / Passport No.','Residence','Daily Rate (KES)','Lease Term (Weeks)','Status']] },
       });
     }
   } catch (e) { console.error('Header check failed:', e.message); }
@@ -64,9 +64,9 @@ app.post('/bikes/:plate/inquire', async (req, res) => {
   const plate = req.params.plate.toUpperCase();
   const key = plate.replace(/\s/g, '');
   const bikeInfo = BIKE_DATA[key] || {};
-  const { name, phone, email, id_no, occupation, residence } = req.body;
 
-  if (!name || !phone || !email || !id_no || !occupation || !residence)
+
+
     return res.send(buildResultPage(plate, false, 'Please fill in all required fields before reserving.'));
 
   const { duplicate, reason } = await checkDuplicate(plate, email);
@@ -80,7 +80,7 @@ app.post('/bikes/:plate/inquire', async (req, res) => {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A1`, valueInputOption: 'RAW',
       resource: { values: [[
-        new Date().toISOString(), plate, name, phone, email, id_no, occupation, residence,
+
         bikeInfo.rate ? `KES ${bikeInfo.rate}/day` : '',
         bikeInfo.weeks ? `${bikeInfo.weeks} weeks` : '',
         'Reserved'
@@ -231,7 +231,7 @@ function buildFormPage(plate, bikeInfo) {
       </div>
       <div class="row">
         <div class="field"><label>ID / Passport No. <span class="required">*</span></label><input type="text" name="id_no" id="id_no" placeholder="National ID or Passport" required/></div>
-        <div class="field"><label>Occupation <span class="required">*</span></label><input type="text" name="occupation" id="occupation" placeholder="e.g. Rider, Trader" required/></div>
+
       </div>
       <div class="field"><label>Area of Residence <span class="required">*</span></label><input type="text" name="residence" id="residence" placeholder="e.g. Nairobi, Thika" required/></div>
       <button type="submit" class="submit-btn" id="submitBtn" disabled>Fill all fields to Reserve Bike</button>
@@ -240,7 +240,7 @@ function buildFormPage(plate, bikeInfo) {
   </div>
   <div class="footer">Greenwheels Mobility Limited · Nairobi, Kenya<br/><a href="mailto:info@greenwheels.co.ke">info@greenwheels.co.ke</a> · +254 700 000 000</div>
   <script>
-    const fields=['name','phone','email','id_no','occupation','residence'];
+
     const btn=document.getElementById('submitBtn');
     function check(){const ok=fields.every(id=>document.getElementById(id).value.trim()!=='');btn.disabled=!ok;btn.classList.toggle('ready',ok);btn.textContent=ok?'Reserve Bike →':'Fill all fields to Reserve Bike';}
     fields.forEach(id=>document.getElementById(id).addEventListener('input',check));
