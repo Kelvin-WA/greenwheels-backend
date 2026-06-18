@@ -240,7 +240,7 @@ function buildFormPage(plate, bikeInfo) {
   </div>
   <div class="footer">Greenwheels Mobility Limited · Nairobi, Kenya<br/><a href="mailto:info@greenwheels.co.ke">info@greenwheels.co.ke</a> · +254 700 000 000</div>
   <script>
-
+    const fields=['name','phone','email','id_no','residence'];
     const btn=document.getElementById('submitBtn');
     function check(){const ok=fields.every(id=>document.getElementById(id).value.trim()!=='');btn.disabled=!ok;btn.classList.toggle('ready',ok);btn.textContent=ok?'Reserve Bike →':'Fill all fields to Reserve Bike';}
     fields.forEach(id=>document.getElementById(id).addEventListener('input',check));
