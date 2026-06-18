@@ -64,9 +64,9 @@ app.post('/bikes/:plate/inquire', async (req, res) => {
   const plate = req.params.plate.toUpperCase();
   const key = plate.replace(/\s/g, '');
   const bikeInfo = BIKE_DATA[key] || {};
+  const { name, phone, email, id_no, residence } = req.body;
 
-
-
+  if (!name || !phone || !email || !id_no || !residence)
     return res.send(buildResultPage(plate, false, 'Please fill in all required fields before reserving.'));
 
   const { duplicate, reason } = await checkDuplicate(plate, email);
