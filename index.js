@@ -388,20 +388,38 @@ tr:hover td{background:#f8fdfb}
   </div>
   ${msg ? `<div class="msg">✅ ${msg}</div>` : ''}
   <div class="card">
-    <div class="ch">All Reservations</div>
+    <div class="ch" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <span>All Reservations</span>
+      <input type="text" id="searchBox" onkeyup="filterTable()" placeholder="🔍  Search plate, name, phone, email..." style="border:1.5px solid #d0ede3;border-radius:8px;padding:7px 14px;font-size:.85rem;outline:none;width:300px;max-width:100%"/>
+    </div>
+    <div id="noResults" style="display:none;text-align:center;padding:24px;color:#aaa">No results found.</div>
     ${data.length === 0 ? '<div class="empty">No reservations yet</div>' : `
     <div style="overflow-x:auto">
-      <table>
+      <table id="resTable">
         <thead><tr>
           <th>Plate</th><th>Name</th><th>Phone</th><th>Email</th>
           <th>ID No.</th><th>Residence</th>
           <th>Daily Rate</th><th>Lease Term</th><th>Reserved At</th>
           <th>Status</th><th>Action</th>
         </tr></thead>
-        <tbody>${tableRows}</tbody>
+        <tbody id="resBody">${tableRows}</tbody>
       </table>
     </div>`}
   </div>
+  <script>
+  function filterTable(){
+    var q=document.getElementById('searchBox').value.toLowerCase();
+    var rows=document.getElementById('resBody').getElementsByTagName('tr');
+    var count=0;
+    for(var i=0;i<rows.length;i++){
+      var match=rows[i].textContent.toLowerCase().indexOf(q)>-1;
+      rows[i].style.display=match?'':'none';
+      if(match)count++;
+    }
+    document.getElementById('noResults').style.display=count===0?'block':'none';
+  }
+  window.onload=function(){var s=document.getElementById('searchBox');if(s)s.focus();}
+  </script>
 </div>
 </body>
 </html>`;
@@ -412,4 +430,3 @@ app.listen(PORT, async () => {
   console.log('Greenwheels backend v4 running on port ' + PORT);
   await ensureHeader();
 });
- 
